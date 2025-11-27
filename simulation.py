@@ -63,6 +63,8 @@ class FridgeDRSim:
         dend = dstart + pd.Timedelta(days=1, minutes=1)
 
         day_load_hourly = self.hourly_load_data.loc[dstart:dend]
+        if len(day_load_hourly) != 25:
+            print(f"Error: {date} has {len(day_load_hourly)} hours of data, expected 25")
         day_load_hourly.index = pd.date_range(dstart, dend, freq='h')
 
         df_grid_min = day_load_hourly.resample('1min').asfreq()
@@ -112,7 +114,7 @@ class FridgeDRSim:
     def simulate_demand_response(self,
         event_start_hour=17, 
         event_end_hour=19,
-        recharge_window_hours=4
+        recharge_window_hours=8
     ):
         """
         Simulates a battery-backed fleet responding to a peak event.
@@ -176,7 +178,7 @@ class FridgeDRSim:
                     action_log[t] = -actual_discharge_kw
                     
             # B. RECHARGE LOGIC (After Peak Window)
-            elif end_idx <= t < recharge_end_idx:
+            elif end_idx + 60 <= t < recharge_end_idx:
                 # Calculate how much energy is missing
                 missing_energy = fleet_capacity_kwh - current_soc
                 
@@ -219,7 +221,7 @@ class FridgeDRSim:
         grid_data = self.load_grid_data(date)
 
         peak_start, peak_end = self.find_peak_shaving_window(grid_data['Load_MW'])
-
+        
         dr_simulation = self.simulate_demand_response(
             event_start_hour=peak_start, 
             event_end_hour=peak_end,
@@ -242,6 +244,9 @@ class FridgeDRSim:
             'new_grid_profile': new_grid_profile,
             'grid_data': grid_data,
             'sim_length': len(self.aggregate_load),
+            'date' : date,
+            'dr_start_hour' : peak_start,
+            'dr_end_hour' : peak_end
         }
 
         return ret
