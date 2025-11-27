@@ -4,10 +4,23 @@ import matplotlib.pyplot as plt
 import os
 
 class FridgeDRSim:
-    def __init__(self, fleet_size=1000000, batt_capacity_wh=500, batt_power_w=500):
+    def __init__(self, rto='ISO-NE', fleet_size=1000000, batt_capacity_wh=500, batt_power_w=500, ercot_rgn=None):
         self.fridge_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'fridge_power.csv'))
         self.n_fridges = 10000
-        self.hourly_load_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'isone_hourly.csv'))
+        
+        self.rto = rto.lower()
+        if self.rto == 'iso-ne':
+            self.hourly_load_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'isone_hourly.csv'))
+        elif self.rto == 'ercot':
+            load_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'ercot_hourly.csv'))
+            if ercot_rgn is None:
+                ercot_rgn = 'ERCOT'
+            if ercot_rgn not in load_data.columns:
+                raise ValueError(f"Invalid ERCOT Region: {ercot_rgn}")
+            self.hourly_load_data = pd.DataFrame({'timestamp': load_data['timestamp'], 'Load_MW': load_data[ercot_rgn]})
+        else:
+            raise ValueError(f"Invalid RTO: {self.rto}")
+
         self.hourly_load_data['timestamp'] = pd.to_datetime(self.hourly_load_data['timestamp'])
         self.hourly_load_data.set_index('timestamp', inplace=True)
 
@@ -178,7 +191,7 @@ class FridgeDRSim:
                     action_log[t] = -actual_discharge_kw
                     
             # B. RECHARGE LOGIC (After Peak Window)
-            elif end_idx + 60 <= t < recharge_end_idx:
+            elif (end_idx + 180 <= t < recharge_end_idx): # wait 3 hours before starting to recharge
                 # Calculate how much energy is missing
                 missing_energy = fleet_capacity_kwh - current_soc
                 
