@@ -4,20 +4,20 @@ import matplotlib.pyplot as plt
 import os
 
 class FridgeDRSim:
-    def __init__(self, rto='ISO-NE', fleet_size=1000000, batt_capacity_wh=500, batt_power_w=500, ercot_rgn=None):
+    def __init__(self, rto='ISO-NE', fleet_size=1000000, batt_capacity_wh=500, batt_power_w=500, sub_region=None):
         self.fridge_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'fridge_power.csv'))
         self.n_fridges = 10000
         
         self.rto = rto.lower()
         if self.rto == 'iso-ne':
             self.hourly_load_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'isone_hourly.csv'))
-        elif self.rto == 'ercot':
-            load_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'ercot_hourly.csv'))
-            if ercot_rgn is None:
-                ercot_rgn = 'ERCOT'
-            if ercot_rgn not in load_data.columns:
-                raise ValueError(f"Invalid ERCOT Region: {ercot_rgn}")
-            self.hourly_load_data = pd.DataFrame({'timestamp': load_data['timestamp'], 'Load_MW': load_data[ercot_rgn]})
+        elif self.rto in ['ercot', 'nyiso', 'caiso']:
+            load_data = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', f'{self.rto}_hourly.csv'))
+            if sub_region is None:
+                sub_region = self.rto.upper()
+            if sub_region not in load_data.columns:
+                raise ValueError(f"Invalid {self.rto} Region: {sub_region}")
+            self.hourly_load_data = pd.DataFrame({'timestamp': load_data['timestamp'], 'Load_MW': load_data[sub_region]})
         else:
             raise ValueError(f"Invalid RTO: {self.rto}")
 
@@ -77,7 +77,8 @@ class FridgeDRSim:
 
         day_load_hourly = self.hourly_load_data.loc[dstart:dend]
         if len(day_load_hourly) != 25:
-            print(f"Error: {date} has {len(day_load_hourly)} hours of data, expected 25")
+            raise ValueError(f"Error: {date} has {len(day_load_hourly)} hours of data, expected 25")
+
         day_load_hourly.index = pd.date_range(dstart, dend, freq='h')
 
         df_grid_min = day_load_hourly.resample('1min').asfreq()
